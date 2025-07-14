@@ -1,0 +1,6 @@
+[submodule "LHM"]
+	path = LHM
+	url = https://github.com/aigc3d/LHM.git
+[submodule "Hunyuan3D-2"]
+	path = Hunyuan3D-2
+	url = https://github.com/Tencent-Hunyuan/Hunyuan3D-2.git

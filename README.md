@@ -54,6 +54,8 @@ La captura inicial se realiza grabando un vídeo en resolución 4K a 30 fps con 
      --dense
     ```
 
+![Video rotatorio](images/Hunyuan_DiT_example.png)
+
 ### 2. LHM: Learning Human Gaussians
 
 Utilizando el modelo avanzado LHM, se generan representaciones Gaussianas en 3D que incluyen posición, covarianzas, colores y opacidad, formando una base robusta para el avatar. LHM emplea un *transformer* multimodal y técnicas de atención global para fusionar efectivamente la información geométrica y visual extraída de la imagen original.
@@ -70,6 +72,12 @@ Utilizando el modelo avanzado LHM, se generan representaciones Gaussianas en 3D 
     -   Color (RGB)
     -   Opacidad ($\alpha$)
 
+**LHM_DataGen y LHM_DataGen_2**
+
+![Generación de Data - LHM](images/LHM-DataGen.png)
+
+![Arquitecura - LHM](images/LHM-DataGen_2.png)
+
 ### 3. 3D Gaussian Splatting
 
 La representación Gaussiana inicial se refina visualmente con herramientas como `gs-viewer` y `GauStudio`. Esto permite renderizados interactivos en tiempo real y la generación eficiente de secuencias visuales que pueden ser exportadas.
@@ -81,6 +89,13 @@ La representación Gaussiana inicial se refina visualmente con herramientas como
 ### 4. Hunyuan3D-2: Modelo de Difusión para Texturizado
 
 Este módulo avanzado de difusión utiliza el sistema **Hunyuan3D-2** para generar mapas de textura altamente detallados y coherentes. Lo hace mediante una generación multivista condicionada por la geometría. El modelo aprovecha técnicas como la atención multi-tarea y la selección eficiente de vistas para optimizar el resultado.
+
+
+![Video rotatorio](images/Hunyuan_mesh.png)
+
+
+![Video rotatorio](images/Hunyuan_DiT.png)
+
 
 **Pasos detallados:**
 1.  **Clonar el repositorio** `Tencent-Hunyuan/Hunyuan3D-2`.
@@ -101,6 +116,8 @@ Este módulo avanzado de difusión utiliza el sistema **Hunyuan3D-2** para gener
      --steps 5 --octree_res 380 --paint_steps 50 --fp16
     ```
 
+![Video rotatorio](images/Hunyuan_DiT_example.png)
+
 ### 5. Inferencia y Post-procesado
 
 El proceso finaliza con la generación y refinamiento de mapas de profundidad, la aplicación de ruido controlado, la generación de un campo de distancia firmado truncado (TSDF) y la conversión a malla mediante el algoritmo de Marching Cubes. El post-procesado ajusta la escala y elimina puntos discrepantes (*outliers*) utilizando la información de SfM.
@@ -109,6 +126,14 @@ El proceso finaliza con la generación y refinamiento de mapas de profundidad, l
 2.  Un *denoiser* genera un TSDF que se convierte en malla (Marching Cubes).
 3.  El texturizado final se realiza en la etapa "Paint" del modelo.
 4.  SfM ajusta la escala y limpia los *outliers*.
+
+
+
+![Video rotatorio](images/Hunyuan_Paint.png)
+
+
+![Video rotatorio](images/Hunyuan_Paint_example.png)
+
 
 ## Resultados
 
@@ -121,6 +146,28 @@ CHAMO genera avatares visualmente ricos y detallados, compatibles con formatos y
 
 #### Galería de Ejemplos
 
+
+
+![Video rotatorio](images/aplicaciones_1_2.png)
+
+
+![Video rotatorio](images/aplicaciones_1_3.png)
+
+
+
+![Video rotatorio](images/aplicaciones_2_1.png)
+
+
+
+![Video rotatorio](images/aplicaciones_2_3.png)
+
+
+
+![Video rotatorio](images/aplicaciones_3_2.png)
+
+
+
+![Video rotatorio](images/aplicaciones_4_1.png)
 
 ## Limitaciones y Desafíos
 

@@ -228,7 +228,7 @@ Para facilitar la interoperabilidad con otras herramientas de software 3D, el pr
 
 ### Interfaz web: Cambios del frontend de Hunyuan3D-2 ([`src/app.py`](src/app.py))
 
-#### `build_model_viewer_html`
+#### 1. `build_model_viewer_html`
 
 Esta función genera dinámicamente el código HTML necesario para mostrar un modelo 3D (`.glb`) en la interfaz.
 
@@ -238,7 +238,7 @@ Su funcionamiento es el siguiente:
 3.  **Crea un Archivo HTML:** Guarda este HTML personalizado en una carpeta temporal.
 4.  **Retorna un `<iframe>`:** La función devuelve una etiqueta `<iframe>` de HTML. Este `<iframe>` carga el archivo HTML recién creado desde una ruta estática (`/static/...`), permitiendo que el visor 3D se **incruste directamente** dentro de la interfaz de Gradio como si fuera un componente nativo.
 
-#### Gradio
+#### 2. Gradio
 
 **Gradio** es una biblioteca de Python que permite crear rápidamente interfaces de usuario web interactivas para modelos de machine learning, sin necesidad de escribir código de front-end (HTML, CSS, JavaScript).
 
@@ -247,7 +247,7 @@ En este script, se utiliza de la siguiente manera:
 -   **Componentes**: Se usan elementos como `gr.Button`, `gr.Image`, `gr.Slider` y `gr.HTML` para construir la interfaz.
 -   **Eventos (`.click()`)**: El método `.click()` es el núcleo de la interactividad. Conecta un componente de la interfaz (ej. un botón) con una función de Python (ej. `shape_generation`). Cuando el usuario interactúa con el componente en el navegador, Gradio ejecuta la función asociada en el backend, pasándole los valores de los campos de entrada y mostrando los resultados en los campos de salida.
 
-### `build_app()`
+#### 3. `build_app()`
 
 Esta función es la **constructora de la interfaz de usuario**. Su responsabilidad es definir, organizar y conectar todos los elementos visuales de la aplicación Gradio.
 
@@ -256,7 +256,7 @@ Esta función es la **constructora de la interfaz de usuario**. Su responsabilid
 3.  **Conecta la Lógica**: Establece los "oyentes de eventos" con los métodos `.click()` y `.change()`. Por ejemplo, asocia el botón "Generar" con la función `shape_generation`, especificando qué componentes de la UI actúan como entradas y cuáles como salidas.
 4.  **Devuelve la App**: Al final, la función retorna el objeto `demo` de Gradio, que representa la aplicación web completamente construida y lista para ser montada en un servidor.
 
-###  El Levantamiento con Uvicorn
+#### 4. Uvicorn
 
 **Uvicorn** es un servidor web ASGI (Asynchronous Server Gateway Interface) de alto rendimiento. Es necesario para "servir" la aplicación web creada con FastAPI y Gradio, haciéndola accesible a través de un navegador.
 

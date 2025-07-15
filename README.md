@@ -173,8 +173,6 @@ La optimización del modelo se guía por una función de pérdida compuesta defi
 -   **Regularización Geométrica**: Las funciones `asap_loss` y `acap_loss` son cruciales. No operan sobre la imagen, sino directamente sobre los parámetros de las Gaussianas 3D para asegurar que la geometría sea coherente y no se degrade.
 -   **Renderizador (`splat_render`)**: **Importante**: En el código del repositorio, `splat_render` es una **función placeholder** que retorna un tensor de ceros. Para que el entrenamiento funcione, esta debe ser reemplazada por un **renderizador diferencial de splatting** real.
 
----
-
 #### 4. Sistema de Entrenamiento (`LHMSystem`) y Ejecución
 
 El bucle de entrenamiento se abstrae utilizando la clase `LHMSystem` de PyTorch Lightning.
@@ -182,7 +180,90 @@ El bucle de entrenamiento se abstrae utilizando la clase `LHMSystem` de PyTorch 
 -   **Módulo Lightning (`LHMSystem`)**: Encapsula el modelo `LHM` y define:
     -   `training_step`: Contiene la lógica para un paso de entrenamiento. **Nota**: En el código actual, `body_pts`, `img_tok` y `head_tok` se inicializan con datos aleatorios (`torch.randn`). Esto indica que se necesita un codificador de imágenes (como CLIP) y una estrategia de muestreo de puntos para una ejecución real.
     -   `configure_optimizers`: Configura el optimizador `AdamW` y un planificador de tasa de aprendizaje `CosineAnnealingLR`.
--   **Punto de Entrada (`main`)**: La función `main` inicializa el `DataLoader` y el `pl.Trainer`. La configuración del `Trainer` está preparada para un entrenamiento a gran escala, utilizando la estrategia `DDPStrategy` para **entrenamiento distribuido en 32 GPUs** y `precision='bf16-mixed'` para **acelerar el cálculo** y reducir el consumo de memoria.
+
+### Estructura de Datos: Octree ([`src/octree.py`](src/octree.py))
+
+Para optimizar las operaciones espaciales, como la búsqueda de vecinos cercanos en nubes de puntos, el proyecto utiliza una implementación de un **Octree**. Esta es una estructura de datos de árbol en la que cada nodo interno tiene exactamente ocho hijos. Es especialmente eficiente para particionar un espacio tridimensional de forma recursiva.
+
+#### 1. La Clase `NodoOctree`
+
+Esta clase, definida como un `dataclass`, representa un único nodo (un cubo) en el árbol y contiene toda la lógica recursiva.
+
+-   **Atributos Clave**:
+    -   `centro` y `mitad`: Definen el volumen cúbico del nodo en el espacio 3D.
+    -   `puntos`: Una lista que almacena los puntos 3D si el nodo es una **hoja** (no tiene hijos).
+    -   `hijos`: Una lista de 8 `NodoOctree` si es un **nodo interno**.
+    -   `max_puntos` y `max_profundidad`: Controlan cuándo un nodo hoja debe subdividirse.
+
+-   **Método de Inserción (`insertar`)**:
+    1.  Si el nodo ya tiene hijos, determina a cuál de los 8 octantes pertenece el punto (usando `_hijo_adecuado`) y le delega la inserción de forma recursiva.
+    2.  Si es un nodo hoja, simplemente añade el punto a su lista `puntos`.
+    3.  **La magia de la subdivisión**: Después de añadir un punto, si el número de puntos en la hoja supera `max_puntos` y no se ha alcanzado `max_profundidad`, el nodo se subdivide llamando a `_subdividir()`. Luego, re-inserta todos los puntos que contenía en sus nuevos hijos, convirtiéndose en un nodo interno.
+
+-   **Método de Búsqueda (`buscar_rango`)**:
+    Este método encuentra eficientemente todos los puntos dentro de un radio esférico.
+    1.  **Poda del Árbol**: Primero comprueba si el cubo del nodo se intersecta con la esfera de búsqueda (`_intersecta_esfera`). Si no hay intersección, **descarta esta rama completa del árbol** y todos sus descendientes, lo que acelera masivamente la búsqueda.
+    2.  **Recursión**: Si hay intersección y es un nodo interno, llama recursivamente a `buscar_rango` en sus 8 hijos.
+    3.  **Comprobación Final**: Si es un nodo hoja, itera sobre su pequeña lista de puntos y realiza una comprobación de distancia exacta (`np.linalg.norm`) para ver cuáles están realmente dentro del radio.
+
+#### 2. La Clase `Octree`
+
+Esta clase actúa como una envoltura o fachada (`Facade`) para simplificar el uso de la estructura de datos.
+
+-   **Inicialización**: Al crear un objeto `Octree`, se inicializa automáticamente el nodo `raiz` que abarca todo el espacio de trabajo.
+-   **Métodos Simplificados**: Proporciona métodos `insertar` y `buscar_rango` limpios que simplemente llaman a los métodos correspondientes del nodo raíz, ocultando la complejidad recursiva al usuario final.
+
+### Utilidad de Conversión ([`src/convertor.py`](src/convertor.py))
+
+Para facilitar la interoperabilidad con otras herramientas de software 3D, el proyecto incluye un script de utilidad para la conversión de formatos de malla. Este es una herramienta de línea de comandos que utiliza la poderosa biblioteca `trimesh` para convertir archivos `.glb` a otros formatos comunes.
+
+#### Características Principales
+
+-   **Carga GLB (`load_glb`)**: El script está diseñado para manejar archivos `.glb` complejos. Si el archivo contiene una escena con múltiples mallas separadas, la función las **fusiona automáticamente** en un único objeto `trimesh.Trimesh`, simplificando el proceso de conversión.
+-   **Soporte Multiformato (`export_mesh`)**: Permite la exportación a los formatos 3D más comunes:
+    -   `OBJ` (con materiales, si están presentes)
+    -   `PLY` (ideal para nubes de puntos y mallas simples)
+    -   `STL` (común en impresión 3D)
+-   **Interfaz de Línea de Comandos (`argparse`)**: Proporciona una interfaz de usuario flexible y fácil de usar para especificar el archivo de entrada, los formatos de salida deseados y un directorio de destino.
+
+### Interfaz web: Cambios del frontend de Hunyuan3D-2 ([`src/app.py`](src/app.py))
+
+#### `build_model_viewer_html`
+
+Esta función genera dinámicamente el código HTML necesario para mostrar un modelo 3D (`.glb`) en la interfaz.
+
+Su funcionamiento es el siguiente:
+1.  **Lee una Plantilla:** Carga un archivo `template.html` que contiene el código para el visor de modelos `<model-viewer>`.
+2.  **Inyecta Datos:** Reemplaza marcadores de posición en la plantilla (como `#src#`, `#height#`) con la ruta del archivo `.glb` específico que se acaba de generar y las dimensiones deseadas.
+3.  **Crea un Archivo HTML:** Guarda este HTML personalizado en una carpeta temporal.
+4.  **Retorna un `<iframe>`:** La función devuelve una etiqueta `<iframe>` de HTML. Este `<iframe>` carga el archivo HTML recién creado desde una ruta estática (`/static/...`), permitiendo que el visor 3D se **incruste directamente** dentro de la interfaz de Gradio como si fuera un componente nativo.
+
+#### Gradio
+
+**Gradio** es una biblioteca de Python que permite crear rápidamente interfaces de usuario web interactivas para modelos de machine learning, sin necesidad de escribir código de front-end (HTML, CSS, JavaScript).
+
+En este script, se utiliza de la siguiente manera:
+-   **`gr.Blocks`**: Actúa como un lienzo donde se organizan todos los componentes visuales (botones, sliders, áreas para subir imágenes, etc.).
+-   **Componentes**: Se usan elementos como `gr.Button`, `gr.Image`, `gr.Slider` y `gr.HTML` para construir la interfaz.
+-   **Eventos (`.click()`)**: El método `.click()` es el núcleo de la interactividad. Conecta un componente de la interfaz (ej. un botón) con una función de Python (ej. `shape_generation`). Cuando el usuario interactúa con el componente en el navegador, Gradio ejecuta la función asociada en el backend, pasándole los valores de los campos de entrada y mostrando los resultados en los campos de salida.
+
+### `build_app()`
+
+Esta función es la **constructora de la interfaz de usuario**. Su responsabilidad es definir, organizar y conectar todos los elementos visuales de la aplicación Gradio.
+
+1.  **Define la Estructura**: Utiliza `gr.Blocks`, `gr.Row`, `gr.Column` y `gr.Tab` para crear el diseño visual de la página web.
+2.  **Crea los Controles**: Instancia todos los componentes interactivos que el usuario verá, como los cuadros para cargar imágenes, el campo de texto para el *prompt*, los botones "Generar", y los sliders para las opciones avanzadas (seed, pasos de inferencia, etc.).
+3.  **Conecta la Lógica**: Establece los "oyentes de eventos" con los métodos `.click()` y `.change()`. Por ejemplo, asocia el botón "Generar" con la función `shape_generation`, especificando qué componentes de la UI actúan como entradas y cuáles como salidas.
+4.  **Devuelve la App**: Al final, la función retorna el objeto `demo` de Gradio, que representa la aplicación web completamente construida y lista para ser montada en un servidor.
+
+###  El Levantamiento con Uvicorn
+
+**Uvicorn** es un servidor web ASGI (Asynchronous Server Gateway Interface) de alto rendimiento. Es necesario para "servir" la aplicación web creada con FastAPI y Gradio, haciéndola accesible a través de un navegador.
+
+La línea `uvicorn.run(app, host=args.host, port=args.port, workers=1)` realiza lo siguiente:
+-   **Inicia el Servidor**: Pone en marcha un proceso de servidor web.
+-   **Carga la Aplicación**: Le indica a Uvicorn que cargue el objeto `app` (que es una aplicación FastAPI que tiene montada la interfaz de Gradio).
+-   **Expone la Aplicación**: Hace que la interfaz web sea accesible en la red en el `host` y `port` especificados en los argumentos (por ejemplo, `http://0.0.0.0:8080`). Una vez que esta línea se ejecuta, puedes abrir tu navegador y navegar a esa dirección para usar la aplicación.
 
 ## Resultados
 

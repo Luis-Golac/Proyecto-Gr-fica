@@ -131,15 +131,12 @@ Se reconocen limitaciones específicas, incluyendo:
 -   **Requerimientos de hardware:** Se requiere una GPU con **24 GB de VRAM o más** para la inferencia de alta calidad. Pudimos optimizar el proceso para GPUs de 8 GB de VRAM, pero se obtuvieron resultados de menor calidad (modelos 3D con baja resolución, estilo *low-poly*).
 -   **Costos de entrenamiento:** Los costos asociados al entrenamiento inicial de estos modelos en la nube son elevados.
 
----
-
 ## Conclusiones y Futuro
 
 El proyecto CHAMO ha demostrado la eficacia de integrar técnicas modernas en un pipeline reproducible y modular para generar avatares 3D. El pipeline unifica con éxito lo mejor de varias metodologías de código abierto, y la representación gaussiana subyacente permite un renderizado muy eficiente.
 
 Futuros trabajos deberían centrarse en abordar las limitaciones actuales, explorando técnicas avanzadas de auto-supervisión, el manejo de múltiples poses de forma simultánea y la mejora del tratamiento de materiales complejos y deformables.
 
----
 
 ## Gestión del Proyecto
 
@@ -149,15 +146,11 @@ La gestión efectiva del proyecto se ha basado en una documentación rigurosa y 
 -   **Versionado reproducible** con commits fijos para garantizar la consistencia.
 -   **Documentación interna y scripts** de ejemplo en cada etapa del pipeline.
 
----
-
 ## Repositorio y Material Adicional
 
 -   **Repositorio en GitHub:** [**https://github.com/Luis-Golac/Proyecto-Grafica**](https://github.com/Luis-Golac/Proyecto-Grafica)
 -   **Evidencias Visuales (Resultados):** [**Google Drive Link**](https://drive.google.com/drive/folders/158Q5FyuQa-Iufpe3F8zaNGboUipd60qP)
 -   La **página web** del proyecto se encuentra en el código adjunto en el entregable final.
-
----
 
 ## Referencias
 

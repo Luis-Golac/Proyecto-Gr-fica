@@ -134,6 +134,55 @@ El proceso finaliza con la generación y refinamiento de mapas de profundidad, l
 
 ![Video rotatorio](images/Hunyuan_Paint_example.png)
 
+## Modificaciones Realizadas
+
+
+### Código de Entrenamiento ([`src/train.py`](src/train.py))
+
+Esta sección detalla la implementación del script de entrenamiento principal del repositorio.
+
+#### 1. Carga de Datos: La Clase `VideoFrameDataset`
+
+La preparación de los datos es manejada por la clase `VideoFrameDataset`, diseñada para procesar los datos de video y geometría.
+
+-   **Función Principal:** Su objetivo es leer directorios que contienen los fotogramas de un video (`.jpg`) y un archivo `smplx.json` con los metadatos de la geometría.
+-   **Muestreo (`__getitem__`)**: Para cada video, el método `__getitem__` selecciona aleatoriamente un conjunto de `n_source` imágenes de referencia y `n_target` imágenes de destino.
+-   **Metadatos de Geometría**: Carga de forma crítica los parámetros del modelo paramétrico **SMPL-X** desde `smplx.json`. El código extrae `betas` (forma), `thetas` (pose), `expressions` y `camera`, que son tensores esenciales para condicionar el modelo.
+
+
+#### 2. Arquitectura del Modelo: El Transformer `LHM`
+
+La arquitectura principal, implementada en la clase `LHM`, es un **Transformer multimodal** que fusiona diferentes tipos de información.
+
+-   **Bloques Fundamentales**: El modelo se construye a partir de módulos estándar de Transformer:
+    -   `Attention`: Una implementación de atención multi-cabeza.
+    -   `Block`: Un bloque de Transformer completo que combina atención, una MLP y normalización de capa (`LayerNorm`).
+    -   `BHTransformer`: Una pila de `Block` que forma el codificador principal.
+-   **Flujo de Datos en `LHM.forward()`**:
+    1.  **Entradas**: El método `forward` recibe `body_pts` (puntos de la geometría), `image_tok` (tokens de la imagen de referencia) y `head_tok` (tokens de la cabeza).
+    2.  **Codificación de Posición**: La función `fourier_emb` convierte las coordenadas 3D de `body_pts` en un embedding de alta frecuencia, permitiendo al modelo entender mejor la posición espacial.
+    3.  **Fusión**: Los tres tipos de tokens se proyectan a una dimensión común y se **concatenan** en una única secuencia. Este es el paso clave de la fusión multimodal.
+    4.  **Procesamiento**: La secuencia fusionada pasa a través del `BHTransformer`, donde la información se mezcla e integra.
+    5.  **Decodificador (`GaussianDecoder`)**: Finalmente, los tokens de salida asociados a los puntos del cuerpo se procesan con una MLP para predecir los **16 parámetros** que definen cada una de las Gaussianas 3D del avatar.
+
+#### 3. Función de Pérdida y Renderizado
+
+La optimización del modelo se guía por una función de pérdida compuesta definida en el script.
+
+-   **Pérdida Fotométrica**: La función `photometric_loss` calcula la diferencia (L1 + MSE) entre la imagen renderizada y la imagen objetivo real.
+-   **Regularización Geométrica**: Las funciones `asap_loss` y `acap_loss` son cruciales. No operan sobre la imagen, sino directamente sobre los parámetros de las Gaussianas 3D para asegurar que la geometría sea coherente y no se degrade.
+-   **Renderizador (`splat_render`)**: **Importante**: En el código del repositorio, `splat_render` es una **función placeholder** que retorna un tensor de ceros. Para que el entrenamiento funcione, esta debe ser reemplazada por un **renderizador diferencial de splatting** real.
+
+---
+
+#### 4. Sistema de Entrenamiento (`LHMSystem`) y Ejecución
+
+El bucle de entrenamiento se abstrae utilizando la clase `LHMSystem` de PyTorch Lightning.
+
+-   **Módulo Lightning (`LHMSystem`)**: Encapsula el modelo `LHM` y define:
+    -   `training_step`: Contiene la lógica para un paso de entrenamiento. **Nota**: En el código actual, `body_pts`, `img_tok` y `head_tok` se inicializan con datos aleatorios (`torch.randn`). Esto indica que se necesita un codificador de imágenes (como CLIP) y una estrategia de muestreo de puntos para una ejecución real.
+    -   `configure_optimizers`: Configura el optimizador `AdamW` y un planificador de tasa de aprendizaje `CosineAnnealingLR`.
+-   **Punto de Entrada (`main`)**: La función `main` inicializa el `DataLoader` y el `pl.Trainer`. La configuración del `Trainer` está preparada para un entrenamiento a gran escala, utilizando la estrategia `DDPStrategy` para **entrenamiento distribuido en 32 GPUs** y `precision='bf16-mixed'` para **acelerar el cálculo** y reducir el consumo de memoria.
 
 ## Resultados
 
